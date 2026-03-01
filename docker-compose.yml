@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  backend:
+    build: ./backend
+    ports: ["4000:4000"]
+    environment:
+      - PORT=4000
+      - DATABASE_URL=file:/app/prisma/dev.db
+      - JWT_SECRET=super_secret_cambialo
+    volumes:
+      - ./backend:/app
+    command: sh -c "npm install && npm run db:setup && npm run dev"
+
+  frontend:
+    build: ./frontend
+    ports: ["5173:5173"]
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    volumes:
+      - ./frontend:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"

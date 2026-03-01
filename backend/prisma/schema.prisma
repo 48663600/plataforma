@@ -1,0 +1,14 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model AppState {
+  id        Int      @id @default(1)
+  data      String   // SQLite ya lo maneja como TEXT internamente
+  updatedAt DateTime @updatedAt
+}
