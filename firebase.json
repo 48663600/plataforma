@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "public": "academiq_fullstack/frontend/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}
