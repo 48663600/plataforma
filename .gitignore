@@ -1,25 +1,28 @@
-# Node
+# Dependencies
 node_modules/
-dist/
-build/
 
-# Env
+# Environment variables
 .env
 .env.*
-*.local
+!.env.example
 
 # Logs
+logs
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
-# OS / Editor
+# OS files
 .DS_Store
 Thumbs.db
+
+# Build
+dist/
+build/
+backend/prisma/dev.db
+backend/prisma/*.db-journal
+
+# IDE
 .vscode/
 .idea/
-
-# Firebase cache
-.firebase/
-
