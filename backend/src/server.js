@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
@@ -9,37 +11,41 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
+function asyncHandler(fn) {
+  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+}
+
 app.get("/", (_, res) => res.json({ ok: true, name: "AcademiQ API" }));
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", asyncHandler(async (req, res) => {
   const { role, user, pass } = req.body || {};
   if (!role || !user || !pass) return res.status(400).json({ error: "Missing fields" });
 
   const state = await getState();
-  if (!state) return res.status(500).json({ error: "State not initialized" });
+  if (!state) return res.status(503).json({ error: "Base de datos no inicializada. Ejecute la semilla (seed)." });
 
   if (role === "student") {
     const st = (state.students || []).find((s) => s.username === user || s.email === user);
-    if (!st) return res.status(401).json({ error: "Invalid credentials" });
+    if (!st) return res.status(401).json({ error: "Credenciales incorrectas o alumno no encontrado." });
     const ok = await bcrypt.compare(pass, st.password);
-    if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+    if (!ok) return res.status(401).json({ error: "Credenciales incorrectas o alumno no encontrado." });
 
     const token = jwt.sign({ id: st.id, role: "student", name: st.name }, process.env.JWT_SECRET, { expiresIn: "8h" });
     return res.json({ token, user: { ...st, role: "student", password: st.passwordPlain } });
   }
 
-  const u = (state.users || []).find((x) => x.role === role && (x.email === user || x.name === user));
-  if (!u) return res.status(401).json({ error: "Invalid credentials" });
+  const u = (state.users || []).find((x) => x.role === role && (x.email === user || x.username === user || x.name === user));
+  if (!u) return res.status(401).json({ error: "Credenciales incorrectas o usuario no encontrado." });
   const ok = await bcrypt.compare(pass, u.password);
-  if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+  if (!ok) return res.status(401).json({ error: "Credenciales incorrectas o usuario no encontrado." });
 
   const token = jwt.sign({ id: u.id, role: u.role, name: u.name }, process.env.JWT_SECRET, { expiresIn: "8h" });
   return res.json({ token, user: { ...u, password: u.passwordPlain } });
-});
+}));
 
-app.get("/api/state", requireAuth, async (req, res) => {
+app.get("/api/state", requireAuth, asyncHandler(async (req, res) => {
   const state = await getState();
-  if (!state) return res.status(500).json({ error: "State not initialized" });
+  if (!state) return res.status(503).json({ error: "Base de datos no inicializada. Ejecute la semilla (seed)." });
 
   if (req.user.role === "student") {
     const me = (state.students || []).find((s) => s.id === req.user.id);
@@ -52,10 +58,10 @@ app.get("/api/state", requireAuth, async (req, res) => {
   }
 
   return res.json(state);
-});
+}));
 
-app.put("/api/state", requireAuth, async (req, res) => {
-  if (!["admin","teacher"].includes(req.user.role)) return res.status(403).json({ error: "Forbidden" });
+app.put("/api/state", requireAuth, asyncHandler(async (req, res) => {
+  if (!["admin", "teacher"].includes(req.user.role)) return res.status(403).json({ error: "Forbidden" });
 
   const incoming = req.body;
   if (!incoming || typeof incoming !== "object") return res.status(400).json({ error: "Invalid state" });
@@ -67,6 +73,7 @@ app.put("/api/state", requireAuth, async (req, res) => {
       return { ...u, passwordPlain: plain, password: hashed };
     }));
   }
+
   async function fixStudents(students = []) {
     return Promise.all(students.map(async (s) => {
       const plain = s.passwordPlain || s.password || "";
@@ -78,7 +85,12 @@ app.put("/api/state", requireAuth, async (req, res) => {
   const fixed = { ...incoming, users: await fixUsers(incoming.users || []), students: await fixStudents(incoming.students || []) };
   await setState(fixed);
   return res.json({ ok: true });
+}));
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+  return res.status(500).json({ error: "Internal server error" });
 });
 
-const port = process.env.PORT || 4000;
-app.listen(port, () => console.log(`✅ AcademiQ API on http://localhost:${port}`));
+const port = process.env.PORT || 3000;
+app.listen(port, () => console.log(`AcademiQ API on http://localhost:${port}`));

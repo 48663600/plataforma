@@ -1,12 +1,11 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import * as XLSX from "xlsx";
 
 
 // ============================
 // API (backend)
 // ============================
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
-
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 async function apiFetch(path, { token, method = "GET", body } = {}) {
   const res = await fetch(`${API_URL}${path}`, {
     method,
@@ -28,17 +27,17 @@ const mkId = () => Date.now() + Math.floor(Math.random() * 9999);
 
 const genEmail = (name) => {
   const parts = name.trim().split(/\s+/);
-  const first = parts[0] || "alumno";
+  const first = parts[0] || "usuario";
   const last = parts[1] || "colegio";
   const clean = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
-  return `${clean(first)}.${clean(last)}@alumnos.edu`;
+  return `${clean(first)}_${clean(last)}@wellmann.edu`;
 };
 const genUser = (name) => {
   const parts = name.trim().split(/\s+/);
-  const first = parts[0] || "alumno";
+  const first = parts[0] || "usuario";
   const last = parts[1] || "colegio";
   const clean = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z]/g, "");
-  return `${clean(first)}.${clean(last)}`;
+  return `${clean(first)}_${clean(last)}`;
 };
 const genPass = (name) => {
   const f = name.trim().split(/\s+/)[0] || "Alumno";
@@ -67,6 +66,12 @@ const INIT_DATA = {
     { id: 6, name: "Lenguaje y Literatura", gradeId: 3, teacherId: 4, color: "#f59e0b" },
     { id: 7, name: "Matemática", gradeId: 3, teacherId: 2, color: "#4f7ef7" },
   ],
+  periods: [
+    { id: 1, name: "I Bimestre", weight: 0.10, active: true },
+    { id: 2, name: "II Bimestre", weight: 0.20, active: false },
+    { id: 3, name: "III Bimestre", weight: 0.30, active: false },
+    { id: 4, name: "IV Bimestre", weight: 0.40, active: false },
+  ],
   students: [
     { id: 101, name: "Valentina Pérez López", code: "2024-001", gradeId: 1, status: "active", avatar: "VP", username: "valentina.perez", password: "Valentina2026", email: "valentina.perez@alumnos.edu" },
     { id: 102, name: "Diego Martínez Cruz", code: "2024-002", gradeId: 1, status: "active", avatar: "DM", username: "diego.martinez", password: "Diego2026", email: "diego.martinez@alumnos.edu" },
@@ -80,15 +85,15 @@ const INIT_DATA = {
     { id: 110, name: "Gabriel Jiménez Rueda", code: "2024-010", gradeId: 3, status: "inactive", avatar: "GJ", username: "gabriel.jimenez", password: "Gabriel2026", email: "gabriel.jimenez@alumnos.edu" },
   ],
   assignments: [
-    { id: 1, name: "Tarea 1 – Álgebra Básica", courseId: 1, type: "tarea", maxScore: 10, dueDate: "2024-03-10", instructions: "Resolver ejercicios 1 al 20 del libro de texto, pág. 45." },
-    { id: 2, name: "Examen Parcial 1", courseId: 1, type: "examen", maxScore: 50, dueDate: "2024-03-20", instructions: "Estudiar capítulos 1-4. Se permite calculadora básica." },
-    { id: 3, name: "Proyecto Geometría", courseId: 1, type: "proyecto", maxScore: 40, dueDate: "2024-04-05", instructions: "Construir figuras 3D con cartón y presentar en clase." },
-    { id: 4, name: "Lab. Ecosistemas", courseId: 2, type: "laboratorio", maxScore: 30, dueDate: "2024-03-15", instructions: "Documentar 3 ecosistemas locales con fotos y descripción." },
-    { id: 5, name: "Examen Ciencias 1", courseId: 2, type: "examen", maxScore: 70, dueDate: "2024-03-25", instructions: "Temas: célula, fotosíntesis y ecosistemas." },
-    { id: 6, name: "Tarea Redacción", courseId: 3, type: "tarea", maxScore: 20, dueDate: "2024-03-12", instructions: "Redactar ensayo de 2 páginas sobre un tema libre." },
-    { id: 7, name: "Examen Ortografía", courseId: 3, type: "examen", maxScore: 80, dueDate: "2024-03-22", instructions: "Repasar tildes, puntuación y reglas ortográficas." },
-    { id: 8, name: "Tarea – Ecuaciones", courseId: 4, type: "tarea", maxScore: 15, dueDate: "2024-03-10", instructions: "Resolver sistemas de ecuaciones página 67." },
-    { id: 9, name: "Examen Parcial 2do", courseId: 4, type: "examen", maxScore: 60, dueDate: "2024-03-22", instructions: "Capítulos 1-5, incluye fracciones." },
+    { id: 1, name: "Tarea 1 – Álgebra Básica", courseId: 1, periodId: 1, type: "tarea", maxScore: 10, dueDate: "2024-03-10", instructions: "Resolver ejercicios 1 al 20 del libro de texto, pág. 45." },
+    { id: 2, name: "Examen Parcial 1", courseId: 1, periodId: 1, type: "examen", maxScore: 50, dueDate: "2024-03-20", instructions: "Estudiar capítulos 1-4. Se permite calculadora básica." },
+    { id: 3, name: "Proyecto Geometría", courseId: 1, periodId: 1, type: "proyecto", maxScore: 40, dueDate: "2024-04-05", instructions: "Construir figuras 3D con cartón y presentar en clase." },
+    { id: 4, name: "Lab. Ecosistemas", courseId: 2, periodId: 1, type: "laboratorio", maxScore: 30, dueDate: "2024-03-15", instructions: "Documentar 3 ecosistemas locales con fotos y descripción." },
+    { id: 5, name: "Examen Ciencias 1", courseId: 2, periodId: 1, type: "examen", maxScore: 70, dueDate: "2024-03-25", instructions: "Temas: célula, fotosíntesis y ecosistemas." },
+    { id: 6, name: "Tarea Redacción", courseId: 3, periodId: 1, type: "tarea", maxScore: 20, dueDate: "2024-03-12", instructions: "Redactar ensayo de 2 páginas sobre un tema libre." },
+    { id: 7, name: "Examen Ortografía", courseId: 3, periodId: 1, type: "examen", maxScore: 80, dueDate: "2024-03-22", instructions: "Repasar tildes, puntuación y reglas ortográficas." },
+    { id: 8, name: "Tarea – Ecuaciones", courseId: 4, periodId: 1, type: "tarea", maxScore: 15, dueDate: "2024-03-10", instructions: "Resolver sistemas de ecuaciones página 67." },
+    { id: 9, name: "Examen Parcial 2do", courseId: 4, periodId: 1, type: "examen", maxScore: 60, dueDate: "2024-03-22", instructions: "Capítulos 1-5, incluye fracciones." },
   ],
   scores: [
     { id: 1, studentId: 101, assignmentId: 1, score: 8, submitted: true },
@@ -169,6 +174,37 @@ const totalScore = (studentId, assignments, scores) => {
   return Math.round(total * 10) / 10;
 };
 const maxPossible = (assignments) => assignments.reduce((a, b) => a + b.maxScore, 0);
+
+const getPeriodAvg = (studentId, courseId, periodId, data) => {
+  // Asegurarnos que una assignment sin periodo se cuente en el periodo activo o el 1
+  const activePeriodId = data.periods?.find(p => p.active)?.id || 1;
+  const asgns = data.assignments.filter(a => a.courseId === courseId && (a.periodId || activePeriodId) === periodId);
+  if (!asgns.length) return 0;
+
+  const scoreP = totalScore(studentId, asgns, data.scores);
+  const maxP = maxPossible(asgns);
+  if (maxP === 0) return 0;
+
+  return (scoreP / maxP) * 100;
+};
+
+const calculateFinalGrade = (studentId, courseId, data) => {
+  const pList = data.periods || [];
+  if (!pList.length) {
+    const asgns = data.assignments.filter(a => a.courseId === courseId);
+    if (!asgns.length) return 0;
+    const max = maxPossible(asgns);
+    return max > 0 ? (totalScore(studentId, asgns, data.scores) / max) * 100 : 0;
+  }
+
+  let final = 0;
+  pList.forEach(p => {
+    const avg = getPeriodAvg(studentId, courseId, p.id, data);
+    final += avg * (p.weight || 0);
+  });
+
+  return Math.round(final * 10) / 10;
+};
 const COLORS = ["#4f7ef7", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#84cc16", "#14b8a6", "#f97316"];
 const avatarColor = (s) => COLORS[(s || "A").charCodeAt(0) % COLORS.length];
 const fmtTs = (ts) => {
@@ -902,8 +938,8 @@ function StudentsPage({ data, setData, search, user }) {
         .replace(/[\u0300-\u036f]/g, "")
         .replace(/[^a-z]/g, "");
 
-    const username = `${clean(first)}.${clean(last)}`;
-    const email = `${username}@alumnos.edu`;
+    const username = `${clean(first)}_${clean(last)}`;
+    const email = `${username}@wellmann.edu`;
     const password =
       first.charAt(0).toUpperCase() + first.slice(1).toLowerCase() + "2026";
     const avatar = fullName
@@ -1273,7 +1309,8 @@ function GradeBook({ data, setData, user, search }) {
     if (editA) {
       setData(d => ({ ...d, assignments: d.assignments.map(a => a.id === editA.id ? { ...a, ...aForm, maxScore: parseFloat(aForm.maxScore) } : a) }));
     } else {
-      setData(d => ({ ...d, assignments: [...d.assignments, { ...aForm, id: mkId(), courseId: selCourse, maxScore: parseFloat(aForm.maxScore) }] }));
+      const activePeriodId = data.periods?.find(p => p.active)?.id || 1;
+      setData(d => ({ ...d, assignments: [...d.assignments, { ...aForm, id: mkId(), courseId: selCourse, maxScore: parseFloat(aForm.maxScore), periodId: activePeriodId }] }));
     }
     setAModal(false);
   };
@@ -1878,7 +1915,6 @@ function IncidentsPage({ data, setData, user, search }) {
 function BulletinPage({ data, search }) {
   const [selGrade, setSelGrade] = useState("");
   const [selStudent, setSelStudent] = useState(null);
-  const [period, setPeriod] = useState("I Bimestre 2024");
   const printRef = useRef(null);
 
   const students = useMemo(() => data.students.filter(s => {
@@ -1891,6 +1927,7 @@ function BulletinPage({ data, search }) {
     const student = data.students.find(s => s.id === studentId);
     const gr = data.grades.find(g => g.id === student?.gradeId);
     const courses = data.courses.filter(c => c.gradeId === student?.gradeId);
+    const periods = data.periods || [];
 
     return (
       <div ref={printRef} className="bulletin-sheet" id="bulletin-print">
@@ -1899,7 +1936,7 @@ function BulletinPage({ data, search }) {
             <div style={{ width: 48, height: 48, borderRadius: 12, background: "linear-gradient(135deg,#4f7ef7,#7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Playfair Display',serif", fontSize: 24, fontWeight: 900, color: "#fff" }}>A</div>
             <div>
               <div className="bulletin-title">AcademiQ — Boletín de Calificaciones</div>
-              <div className="bulletin-sub">Período: {period}</div>
+              <div className="bulletin-sub">Consolidado Anual Ponderado</div>
             </div>
           </div>
         </div>
@@ -1910,25 +1947,32 @@ function BulletinPage({ data, search }) {
         </div>
         <div className="bulletin-table">
           <table>
-            <thead><tr><th>Curso</th><th>Docente</th>{data.assignments.filter(a => courses.map(c => c.id).includes(a.courseId)).slice(0, 5).map(a => <th key={a.id} style={{ textAlign: "center", minWidth: 60 }}>{a.name.slice(0, 10)}<br /><span style={{ fontSize: 9, opacity: 0.8 }}>/{a.maxScore}</span></th>)}<th style={{ textAlign: "center" }}>Total</th><th style={{ textAlign: "center" }}>Máximo</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Curso / Materia</th>
+                <th>Docente</th>
+                {periods.map(p => (
+                  <th key={p.id} style={{ textAlign: "center", minWidth: 60 }}>
+                    {p.name}<br />
+                    <span style={{ fontSize: 9, opacity: 0.8 }}>({p.weight * 100}%)</span>
+                  </th>
+                ))}
+                <th style={{ textAlign: "center" }}>Nota Final</th>
+              </tr>
+            </thead>
             <tbody>
               {courses.map(c => {
                 const teacher = data.users.find(u => u.id === c.teacherId);
-                const assigns = data.assignments.filter(a => a.courseId === c.id);
-                const total = totalScore(studentId, assigns, data.scores);
-                const maxP = maxPossible(assigns);
-                const allAssigns = data.assignments.filter(a => courses.map(cc => cc.id).includes(a.courseId)).slice(0, 5);
+                const final = calculateFinalGrade(studentId, c.id, data);
                 return (
                   <tr key={c.id}>
                     <td style={{ fontWeight: 700 }}>{c.name}</td>
                     <td style={{ fontSize: 12, color: "#64748b" }}>{teacher?.name || "–"}</td>
-                    {allAssigns.map(a => {
-                      if (!assigns.find(x => x.id === a.id)) return <td key={a.id} style={{ textAlign: "center", color: "#94a3b8" }}>–</td>;
-                      const sc = data.scores.find(s => s.studentId === studentId && s.assignmentId === a.id);
-                      return <td key={a.id} style={{ textAlign: "center", fontWeight: 700, color: scoreColor(sc?.score, a.maxScore) }}>{sc?.score ?? "–"}</td>;
+                    {periods.map(p => {
+                      const avg = getPeriodAvg(studentId, c.id, p.id, data);
+                      return <td key={p.id} style={{ textAlign: "center", fontWeight: 700, color: scoreColor(avg, 100) }}>{Math.round(avg * 10) / 10 || "–"}</td>;
                     })}
-                    <td style={{ textAlign: "center", fontWeight: 900, fontSize: 16, color: scoreColor(total, maxP) }}>{total}</td>
-                    <td style={{ textAlign: "center", color: "#64748b", fontSize: 13 }}>{maxP}</td>
+                    <td style={{ textAlign: "center", fontWeight: 900, fontSize: 16, color: scoreColor(final, 100) }}>{final}</td>
                   </tr>
                 );
               })}
@@ -1959,12 +2003,6 @@ function BulletinPage({ data, search }) {
           </select>
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
-          <label className="fl">Período</label>
-          <select className="fc" value={period} onChange={e => setPeriod(e.target.value)}>
-            {["I Bimestre 2024", "II Bimestre 2024", "III Bimestre 2024", "IV Bimestre 2024", "Año Completo 2024"].map(p => <option key={p}>{p}</option>)}
-          </select>
-        </div>
-        <div style={{ flex: 1, minWidth: 200 }}>
           <label className="fl">Alumno</label>
           <select className="fc" value={selStudent || ""} onChange={e => setSelStudent(e.target.value ? parseInt(e.target.value) : null)}>
             <option value="">Seleccionar alumno</option>
@@ -1987,6 +2025,135 @@ function BulletinPage({ data, search }) {
       )}
 
       {selStudent && renderBulletin(selStudent)}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  GENERAL REPORTS (Cuadros Generales)
+// ═══════════════════════════════════════════════════════════════
+function GeneralReports({ data, user }) {
+  const [selGrade, setSelGrade] = useState("");
+  const [selCourse, setSelCourse] = useState("");
+
+  const isTeacher = user.role === "teacher";
+
+  // Filtrar cursos según el rol
+  const allowedCourses = isTeacher
+    ? data.courses.filter(c => c.teacherId === user.id)
+    : data.courses;
+
+  // Filtrar grados según el rol (el profesor solo ve grados donde dicta)
+  const allowedGradeIds = new Set(allowedCourses.map(c => c.gradeId));
+  const allowedGrades = isTeacher
+    ? data.grades.filter(g => allowedGradeIds.has(g.id))
+    : data.grades;
+
+  const filteredCourses = allowedCourses.filter(c => !selGrade || c.gradeId === parseInt(selGrade));
+
+  const students = data.students.filter(s => s.gradeId === parseInt(selGrade)).filter(s => s.status === "active");
+  const reportAssignments = data.assignments
+    .filter(a => a.courseId === parseInt(selCourse))
+    .sort((a, b) => new Date(a.dueDate || 0).getTime() - new Date(b.dueDate || 0).getTime() || a.id - b.id);
+
+  const rows = students.map((s, idx) => {
+    const gradesPerAssignment = reportAssignments.map(a => {
+      const sc = data.scores.find(sc => sc.studentId === s.id && sc.assignmentId === a.id);
+      return sc?.score;
+    });
+    const totalScore = Math.round(gradesPerAssignment.reduce((sum, v) => sum + (typeof v === "number" ? v : 0), 0) * 10) / 10;
+    return { s, idx, gradesPerAssignment, totalScore };
+  });
+
+  const doExportExcel = () => {
+    try {
+      const gradeName = data.grades.find(g => g.id === parseInt(selGrade))?.name || "Grado";
+      const courseName = data.courses.find(c => c.id === parseInt(selCourse))?.name || "Materia";
+      const headers = ["No.", "Estudiante", ...reportAssignments.map(a => `${a.name} /${a.maxScore}`), "Total Obtenido"];
+      const sheetRows = rows.map(({ s, idx, gradesPerAssignment, totalScore }) => [
+        idx + 1, s.name, ...gradesPerAssignment.map(v => (typeof v === "number" ? v : "—")), totalScore
+      ]);
+      const ws = XLSX.utils.aoa_to_sheet([
+        [`CUADRO GENERAL DE CALIFICACIONES - ${gradeName} - ${courseName}`],
+        [],
+        headers,
+        ...sheetRows,
+      ]);
+      ws["!cols"] = [{ wch: 5 }, { wch: 35 }, ...reportAssignments.map(() => ({ wch: 16 })), { wch: 16 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Cuadro General");
+      XLSX.writeFile(wb, `Cuadro_${gradeName.replace(/ /g, "_")}_${courseName.replace(/ /g, "_")}.xlsx`);
+    } catch (e) {
+      console.error("Export error:", e);
+      window.print();
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ background: "var(--surf)", border: "1.5px solid var(--border)", borderRadius: "var(--r)", padding: 20, marginBottom: 20, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }} className="no-print">
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label className="fl">Grado</label>
+          <select className="fc" value={selGrade} onChange={e => { setSelGrade(e.target.value); setSelCourse(""); }}>
+            <option value="">Seleccionar Grado</option>
+            {allowedGrades.map(g => <option key={g.id} value={g.id}>{g.name} "{g.section}"</option>)}
+          </select>
+        </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <label className="fl">Materia / Curso</label>
+          <select className="fc" value={selCourse} onChange={e => setSelCourse(e.target.value)} disabled={!selGrade}>
+            <option value="">Seleccionar Curso</option>
+            {filteredCourses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="btn btn-primary" onClick={doExportExcel} style={{ height: 40 }} disabled={!selGrade || !selCourse}>📊 Exportar Excel</button>
+          <button className="btn btn-ghost" onClick={() => window.print()} style={{ height: 40 }} disabled={!selGrade || !selCourse}>🖨️ Imprimir</button>
+        </div>
+      </div>
+
+      {selGrade && selCourse ? (
+        <div className="bulletin-sheet" style={{ maxWidth: "100%", width: "auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 900 }}>CUADRO GENERAL DE CALIFICACIONES</h2>
+            <div style={{ color: "var(--txt3)", fontSize: 13 }}>
+              {data.grades.find(g => g.id === parseInt(selGrade))?.name} — Materia: {data.courses.find(c => c.id === parseInt(selCourse))?.name}
+            </div>
+          </div>
+          <div className="tbl-wrap" style={{ overflowX: "auto" }}>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Estudiante</th>
+                  {reportAssignments.map(a => (
+                    <th key={a.id} style={{ textAlign: "center", minWidth: 120 }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 800 }}>{a.name}</div>
+                      <div style={{ fontSize: 10, opacity: 0.7 }}>/{a.maxScore}</div>
+                    </th>
+                  ))}
+                  <th style={{ textAlign: "center", background: "#f1f5f9" }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ s, idx, gradesPerAssignment, totalScore }) => (
+                  <tr key={s.id}>
+                    <td>{idx + 1}</td>
+                    <td style={{ fontWeight: 700 }}>{s.name}</td>
+                    {gradesPerAssignment.map((g, i) => <td key={i} style={{ textAlign: "center" }}>{typeof g === "number" ? g : "–"}</td>)}
+                    <td style={{ textAlign: "center", fontWeight: 900, fontSize: 15, background: "#f8fafc" }}>{totalScore}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="card" style={{ textAlign: "center", padding: 60, color: "var(--txt3)" }}>
+          <div style={{ fontSize: 50 }}>📊</div>
+          <h3>{selGrade ? "Selecciona un curso para visualizar el cuadro general" : "Selecciona un grado y curso para generar el cuadro"}</h3>
+        </div>
+      )}
     </div>
   );
 }
@@ -2016,8 +2183,11 @@ function AdminSetup({ data, setData, search }) {
     setCModal(false);
   };
   const saveTeacher = () => {
-    if (!tForm.name || !tForm.email || !tForm.password) return;
-    const nt = { ...tForm, id: mkId(), role: "teacher", avatar: initials(tForm.name) };
+    if (!tForm.name) return;
+    const email = editT ? tForm.email : genEmail(tForm.name);
+    const password = editT ? tForm.password : genPass(tForm.name);
+    const nt = { ...tForm, email, password, id: mkId(), role: "teacher", avatar: initials(tForm.name) };
+    if (editT && (!tForm.email || !tForm.password)) return;
     if (editT) {
       setData(d => ({ ...d, users: d.users.map(u => u.id === editT.id ? { ...u, ...tForm } : u) }));
       setTModal(false); setEditT(null);
@@ -2170,8 +2340,13 @@ function AdminSetup({ data, setData, search }) {
                   <div className="fg"><label className="fl">Nombre completo</label><input className="fc" value={tForm.name} onChange={e => setTForm({ ...tForm, name: e.target.value })} /></div>
                   <div className="fg"><label className="fl">Especialidad</label><input className="fc" value={tForm.subject} onChange={e => setTForm({ ...tForm, subject: e.target.value })} placeholder="Ej: Matemática" /></div>
                 </div>
-                <div className="fg"><label className="fl">Correo electrónico</label><input className="fc" type="email" value={tForm.email} onChange={e => setTForm({ ...tForm, email: e.target.value })} /></div>
-                <div className="fg"><label className="fl">Contraseña {editT ? "(nueva)" : "(asignada por director)"}</label><input className="fc" value={tForm.password} onChange={e => setTForm({ ...tForm, password: e.target.value })} placeholder="Contraseña segura" /></div>
+                {editT && (
+                  <>
+                    <div className="fg"><label className="fl">Correo electrónico</label><input className="fc" type="email" value={tForm.email} onChange={e => setTForm({ ...tForm, email: e.target.value })} /></div>
+                    <div className="fg"><label className="fl">Contraseña (nueva)</label><input className="fc" value={tForm.password} onChange={e => setTForm({ ...tForm, password: e.target.value })} placeholder="Contraseña segura" /></div>
+                  </>
+                )}
+                {!editT && <div className="info-box">🔑 El correo y la contraseña se generarán automáticamente del nombre.</div>}
                 <div className="modal-foot">
                   <button className="btn btn-ghost" onClick={() => { setTModal(false); setEditT(null); }}>Cancelar</button>
                   <button className="btn btn-primary" onClick={saveTeacher}>{editT ? "Actualizar" : "Registrar"}</button>
@@ -2525,12 +2700,12 @@ function StudentPortal({ data, user }) {
 const NAV_CFG = {
   admin: [
     { section: "Principal", items: [{ id: "dashboard", icon: "⊞", label: "Dashboard" }, { id: "students", icon: "👥", label: "Alumnos" }, { id: "gradebook", icon: "📊", label: "Calificaciones" }, { id: "attendance", icon: "📅", label: "Asistencia" }] },
-    { section: "Gestión", items: [{ id: "bulletin", icon: "📄", label: "Boletines" }, { id: "incidents", icon: "⚠️", label: "Reportes" }, { id: "reports", icon: "📈", label: "Estadísticas" }] },
+    { section: "Gestión", items: [{ id: "bulletin", icon: "📄", label: "Boletines" }, { id: "genreports", icon: "📋", label: "Cuadros Gral." }, { id: "incidents", icon: "⚠️", label: "Reportes" }, { id: "reports", icon: "📈", label: "Estadísticas" }] },
     { section: "Admin", items: [{ id: "setup", icon: "⚙️", label: "Configuración" }, { id: "announcements", icon: "📢", label: "Avisos" }, { id: "chat", icon: "💬", label: "Chat Docentes", notif: true }] },
   ],
   teacher: [
     { section: "Mi Área", items: [{ id: "dashboard", icon: "⊞", label: "Dashboard" }, { id: "mycourses", icon: "📚", label: "Mis Cursos" }, { id: "gradebook", icon: "📊", label: "Calificaciones" }, { id: "quickgrade", icon: "⚡", label: "Nota Rápida" }] },
-    { section: "Gestión", items: [{ id: "attendance", icon: "📅", label: "Asistencia" }, { id: "incidents", icon: "⚠️", label: "Reportes" }] },
+    { section: "Gestión", items: [{ id: "attendance", icon: "📅", label: "Asistencia" }, { id: "genreports", icon: "📋", label: "Cuadros Gral." }, { id: "incidents", icon: "⚠️", label: "Reportes" }] },
     { section: "Comunicación", items: [{ id: "announcements", icon: "📢", label: "Avisos" }, { id: "chat", icon: "💬", label: "Chat General", notif: true }] },
   ],
   student: [
@@ -2618,6 +2793,7 @@ export default function App() {
       case "attendance": return <AttendancePage {...props} />;
       case "reports": return <ReportsPage {...props} />;
       case "bulletin": return <BulletinPage {...props} />;
+      case "genreports": return <GeneralReports {...props} />;
       case "incidents": return <IncidentsPage {...props} />;
       case "setup": return <AdminSetup {...props} />;
       case "announcements": return <AnnouncementsPage {...props} />;
