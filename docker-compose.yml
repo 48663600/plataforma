@@ -7,17 +7,15 @@ services:
       - PORT=3000
       - DATABASE_URL=postgresql://postgres:Guatemala1%402oo1.@aws-0-us-west-2.pooler.supabase.com:5432/postgres?schema=public
       - JWT_SECRET=academiq_jwt_2026_super_seguro_x9KpL82mQwR7zT
-    volumes:
-      - ./backend:/app
-    command: sh -c "npm install && npx prisma generate && npm run dev"
+    restart: always
 
   frontend:
-    build: ./frontend
-    ports: [ "5173:5173" ]
-    environment:
-      - VITE_API_URL=http://localhost:3000
-      - VITE_SUPABASE_URL=https://gcymvavjeywijaikkdls.supabase.co
-      - VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjeW12YXZqZXl3aWphaWtrZGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NDM1OTUsImV4cCI6MjA4ODUxOTU5NX0.rgT0-XCroJuUo0plGMjSm6umEGT4Lrg440OHd7tPVtA
-    volumes:
-      - ./frontend:/app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    build:
+      context: ./frontend
+      args:
+        # Cambia esto por la IP pública de tu VPS, ej: http://192.168.1.100:3000
+        - VITE_API_URL=http://TU_IP_VPS_AQUI:3000
+        - VITE_SUPABASE_URL=https://gcymvavjeywijaikkdls.supabase.co
+        - VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjeW12YXZqZXl3aWphaWtrZGxzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5NDM1OTUsImV4cCI6MjA4ODUxOTU5NX0.rgT0-XCroJuUo0plGMjSm6umEGT4Lrg440OHd7tPVtA
+    ports: [ "80:80" ]
+    restart: always
