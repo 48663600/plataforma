@@ -2,95 +2,104 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { getState, setState } = require("./state");
-const { requireAuth } = require("./auth");
+const { getState, setState, storageName } = require("./state");
+const { requireAuth, loginRateLimit } = require("./auth");
+const { verifyPassword, hashPassword } = require("./password");
+const { isAdminRole, publicState, mergeState } = require("./stateRules");
 
-const app = express();
-app.use(cors());
-app.use(express.json({ limit: "10mb" }));
-
-function asyncHandler(fn) {
-  return (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error("❌ Define JWT_SECRET (mínimo 32 caracteres) en backend/.env. Genera uno con:");
+  console.error("   node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"");
+  process.exit(1);
 }
 
-app.get("/", (_, res) => res.json({ ok: true, name: "AcademiQ API" }));
+const app = express();
+app.set("trust proxy", 1);
 
-app.post("/api/auth/login", asyncHandler(async (req, res) => {
+// CORS_ORIGIN: lista separada por comas (p. ej. https://usuario.github.io). Sin definir = cualquier origen.
+const origins = (process.env.CORS_ORIGIN || "").split(",").map((s) => s.trim()).filter(Boolean);
+app.use(cors(origins.length ? { origin: origins } : {}));
+app.use(express.json({ limit: "10mb" }));
+
+const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+const NOT_READY = { error: "Base de datos no inicializada. Ejecute la semilla: npm run db:seed" };
+const limiter = loginRateLimit();
+
+app.get("/", (_, res) => res.json({ ok: true, name: "AcademiQ API" }));
+app.get("/api/health", (_, res) => res.json({ ok: true }));
+
+app.post("/api/auth/login", limiter.check, asyncHandler(async (req, res) => {
   const { role, user, pass } = req.body || {};
-  if (!role || !user || !pass) return res.status(400).json({ error: "Missing fields" });
+  if (!role || !user || !pass) return res.status(400).json({ error: "Completa usuario y contraseña." });
 
   const state = await getState();
-  if (!state) return res.status(503).json({ error: "Base de datos no inicializada. Ejecute la semilla (seed)." });
+  if (!state) return res.status(503).json(NOT_READY);
 
+  const q = String(user).trim().toLowerCase();
+  const eq = (v) => typeof v === "string" && v.toLowerCase() === q;
+
+  let account;
   if (role === "student") {
-    const st = (state.students || []).find((s) => s.username === user || s.email === user);
-    if (!st) return res.status(401).json({ error: "Credenciales incorrectas o alumno no encontrado." });
-    const ok = await bcrypt.compare(pass, st.password);
-    if (!ok) return res.status(401).json({ error: "Credenciales incorrectas o alumno no encontrado." });
-
-    const token = jwt.sign({ id: st.id, role: "student", name: st.name }, process.env.JWT_SECRET, { expiresIn: "8h" });
-    return res.json({ token, user: { ...st, role: "student", password: st.passwordPlain } });
+    account = (state.students || []).find((s) => eq(s.username) || eq(s.email));
+    if (account && account.status === "inactive") return res.status(403).json({ error: "Tu usuario está inactivo. Consulta con la Dirección." });
+  } else {
+    // El botón "Director" envía role=admin y acepta cuentas admin o director.
+    const roleOk = (r) => (role === "admin" ? isAdminRole(r) : r === role);
+    account = (state.users || []).find((u) => roleOk(u.role) && (eq(u.email) || eq(u.username) || eq(u.name)));
   }
 
-  const u = (state.users || []).find((x) => x.role === role && (x.email === user || x.username === user || x.name === user));
-  if (!u) return res.status(401).json({ error: "Credenciales incorrectas o usuario no encontrado." });
-  const ok = await bcrypt.compare(pass, u.password);
-  if (!ok) return res.status(401).json({ error: "Credenciales incorrectas o usuario no encontrado." });
+  if (!account || !(await verifyPassword(String(pass), account.password))) {
+    limiter.fail(req);
+    return res.status(401).json({ error: "Credenciales incorrectas." });
+  }
+  limiter.reset(req);
 
-  const token = jwt.sign({ id: u.id, role: u.role, name: u.name }, process.env.JWT_SECRET, { expiresIn: "8h" });
-  return res.json({ token, user: { ...u, password: u.passwordPlain } });
+  const sessionRole = role === "student" ? "student" : account.role;
+  const token = jwt.sign({ id: account.id, role: sessionRole, name: account.name }, process.env.JWT_SECRET, { expiresIn: "8h" });
+  return res.json({ token });
 }));
 
 app.get("/api/state", requireAuth, asyncHandler(async (req, res) => {
   const state = await getState();
-  if (!state) return res.status(503).json({ error: "Base de datos no inicializada. Ejecute la semilla (seed)." });
-
-  if (req.user.role === "student") {
-    const me = (state.students || []).find((s) => s.id === req.user.id);
-    const safeUsers = (state.users || []).map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, avatar: u.avatar, subject: u.subject }));
-    const safeStudents = (state.students || []).map((s) => ({
-      id: s.id, name: s.name, code: s.code, gradeId: s.gradeId, status: s.status, avatar: s.avatar, username: s.username, email: s.email,
-      password: s.id === req.user.id ? s.passwordPlain : undefined,
-    }));
-    return res.json({ ...state, users: safeUsers, students: safeStudents, me });
-  }
-
-  return res.json(state);
+  if (!state) return res.status(503).json(NOT_READY);
+  const visible = publicState(state, req.user);
+  if (!visible) return res.status(401).json({ error: "El usuario ya no existe." });
+  return res.json(visible);
 }));
 
 app.put("/api/state", requireAuth, asyncHandler(async (req, res) => {
-  if (!["admin", "teacher"].includes(req.user.role)) return res.status(403).json({ error: "Forbidden" });
-
-  const incoming = req.body;
-  if (!incoming || typeof incoming !== "object") return res.status(400).json({ error: "Invalid state" });
-
-  async function fixUsers(users = []) {
-    return Promise.all(users.map(async (u) => {
-      const plain = u.passwordPlain || u.password || "";
-      const hashed = (typeof u.password === "string" && u.password.startsWith("$2")) ? u.password : await bcrypt.hash(plain, 10);
-      return { ...u, passwordPlain: plain, password: hashed };
-    }));
-  }
-
-  async function fixStudents(students = []) {
-    return Promise.all(students.map(async (s) => {
-      const plain = s.passwordPlain || s.password || "";
-      const hashed = (typeof s.password === "string" && s.password.startsWith("$2")) ? s.password : await bcrypt.hash(plain, 10);
-      return { ...s, passwordPlain: plain, password: hashed };
-    }));
-  }
-
-  const fixed = { ...incoming, users: await fixUsers(incoming.users || []), students: await fixStudents(incoming.students || []) };
-  await setState(fixed);
+  const stored = await getState();
+  if (!stored) return res.status(503).json(NOT_READY);
+  const merged = await mergeState(stored, req.body, req.user, hashPassword);
+  await setState(merged);
   return res.json({ ok: true });
 }));
 
 app.use((err, _req, res, _next) => {
+  if (err.status && err.status < 500) return res.status(err.status).json({ error: err.message });
   console.error(err);
-  return res.status(500).json({ error: "Internal server error" });
+  return res.status(500).json({ error: "Error interno del servidor" });
 });
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`AcademiQ API on http://localhost:${port}`));
+// Limpieza única: versiones anteriores guardaban "passwordPlain" (contraseña en texto plano).
+async function removePlainPasswords() {
+  const state = await getState();
+  if (!state) return;
+  const strip = (list = []) => list.map(({ passwordPlain, ...rest }) => rest);
+  const dirty = [...(state.users || []), ...(state.students || [])].some((a) => "passwordPlain" in a);
+  if (!dirty) return;
+  await setState({ ...state, users: strip(state.users), students: strip(state.students) });
+  console.log("🔒 Se eliminaron contraseñas en texto plano del estado guardado.");
+}
+
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  removePlainPasswords()
+    .catch((e) => console.error("No se pudo revisar el estado guardado:", e.message))
+    .finally(() => {
+      app.listen(port, () => console.log(`AcademiQ API en http://localhost:${port} (almacenamiento: ${storageName()})`));
+    });
+}
+
+module.exports = app;

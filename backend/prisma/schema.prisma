@@ -7,19 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Todo el estado del colegio se guarda como un documento JSON en la fila id = 1.
+model AppState {
+  id        Int      @id
+  data      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Reservado para una futura migración a tablas normalizadas (hoy no se usa).
 model Usuario {
   id        Int      @id @default(autoincrement())
   nombre    String
   correo    String   @unique
   password  String
   rol       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model AppState {
-  id        Int      @id
-  data      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

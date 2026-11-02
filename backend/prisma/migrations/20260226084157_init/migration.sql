@@ -1,6 +1,0 @@
--- CreateTable
-CREATE TABLE "AppState" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT DEFAULT 1,
-    "data" TEXT NOT NULL,
-    "updatedAt" DATETIME NOT NULL
-);
